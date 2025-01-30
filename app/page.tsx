@@ -29,7 +29,7 @@ export default function ContentForge() {
         const response = await fetch('/api/ai/generate', {
           method: 'POST',
           body: JSON.stringify({
-            type: 'variation',
+            type: 'captions',
             content: textInput,
             language: 'en-US'
           })
@@ -63,34 +63,63 @@ export default function ContentForge() {
 
       // For YouTube URLs
       if (activeInputTab === 'url' && youtubeUrl) {
-        const transcript = await YouTubeService.getTranscript(youtubeUrl);
-        const response = await fetch('/api/ai/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            source: 'youtube',
-            input: transcript,
-            language: 'en-US',
-            userId: 'current-user-id'
-          })
-        });
-        
-        const result = await response.json();
-        console.log('YouTube API Response Structure:', {
-          status: response.status,
-          keys: Object.keys(result),
-          captionsExists: Array.isArray(result.captions)
-        });
-        
-        if (!result?.captions) {
-          console.error('YouTube response missing captions:', result);
-          toast.error(result?.error || 'Failed to generate from YouTube video');
-          throw new Error('YouTube processing failed');
+        try {
+          const transcript = await YouTubeService.getTranscript(youtubeUrl);
+          // Then use the transcript directly with your AI services
+          const response = await fetch('/api/ai/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'captions',
+              content: transcript,
+              language: 'en-US'
+            })
+          });
+
+          if (!response.ok) {
+            const errorBody = await response.json();
+            console.error('API Error Details:', {
+              status: response.status,
+              error: errorBody,
+              transcriptPreview: transcript.substring(0, 100)
+            });
+            throw new Error(`Generation failed: ${errorBody.error || response.statusText}`);
+          }
+          
+          const result = await response.json();
+          console.log('API Response Structure:', {
+            status: response.status,
+            keys: Object.keys(result),
+            captionsExists: Array.isArray(result.captions),
+            rawResult: result
+          });
+          
+          if (!result?.captions) {
+            console.error('Missing captions in response:', result);
+            toast.error(result?.error?.message || result?.message || 'Malformed API response');
+            throw new Error(result?.error || 'Malformed API response');
+          }
+          
+          setGeneratedItems(result.captions.map((c: string, i: number) => 
+            ({id: i, content: c, type: 'caption' as const})));
+          toast.success('Captions generated successfully!');
+          
+        } catch (error) {
+          console.error('Full YouTube processing error:', {
+            error: {
+              message: error instanceof Error ? error.message : 'Unknown error',
+              name: error instanceof Error ? error.name : 'Error',
+            },
+            youtubeUrl,
+            timestamp: new Date().toISOString(),
+            navigator: {
+              onLine: navigator.onLine,
+              connection: navigator.connection?.effectiveType ?? 'unsupported'
+            }
+          });
+          toast.error(error instanceof Error ? error.message : 'YouTube processing failed');
+          setIsLoading(false);
         }
-        
-        setGeneratedItems(result.captions.map((c: string, i: number) => 
-          ({id: i, content: c, type: 'caption' as const})));
-        toast.success('YouTube captions generated!');
       }
 
       // For PDFs is handled separately in handlePDFUpload
