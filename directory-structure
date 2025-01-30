@@ -1,0 +1,2 @@
+mkdir -p src/lib/ai
+mv lib/ai/deepseek-service.ts src/lib/ai/ 
