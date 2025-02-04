@@ -1,0 +1,104 @@
+import { NextResponse } from 'next/server';
+import pdf from 'pdf-parse';
+import { Buffer } from 'buffer';
+
+// Define interface for PDF parse result
+interface PDFData {
+  text: string;
+  numpages: number;
+  numrender: number;
+  info: Record<string, string>;
+  metadata: {
+    metadata: Record<string, unknown>;
+  };
+  version: string;
+}
+
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Increased timeout
+
+// This route handles PDF processing through POST requests
+export async function POST(request: Request) {
+  try {
+    const { pdfUrl } = await request.json();
+    
+    // Core PDF processing logic:
+    // 1. Validates Cloudinary URL
+    // 2. Fetches PDF with timeout
+    // 3. Extracts text using pdf-parse
+    // 4. Splits into captions
+    // 5. Returns JSON response
+
+    // Validate URL
+    if (!pdfUrl /*|| !pdfUrl?.startsWith('https://res.cloudinary.com/')*/) {
+      return NextResponse.json(
+        { error: 'Invalid PDF URL' },
+        { status: 400 }
+      );
+    }
+
+    // Fetch PDF with timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    
+    const response = await fetch(pdfUrl, {
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PDF: ${response.statusText}`);
+    }
+
+    const buffer = await response.arrayBuffer();
+    const data = await pdf(Buffer.from(buffer)) as PDFData;
+
+    // Process content with error handling
+    const captions = data.text
+      .split(/\n\s*\n/) // Handle different paragraph separations
+      .map((text: string, index: number) => ({
+        id: `${Date.now()}-${index}`,
+        content: text.trim(),
+        type: 'caption'
+      }))
+      .filter((item: { content: string }) => item.content.length > 10) // Minimum 10 characters
+      .slice(0, 15);
+
+    if (captions.length === 0) {
+      return NextResponse.json(
+        { error: 'No readable content found in PDF' },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ captions });
+
+  } catch (error) {
+    console.error('PDF Processing Error:', error);
+    return NextResponse.json(
+      { 
+        error: error instanceof Error ? error.message : 'PDF processing failed',
+        stack: error instanceof Error ? error.stack : undefined
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const pdfUrl = searchParams.get('pdfUrl');
+  
+  if (!pdfUrl) {
+    return NextResponse.json(
+      { error: 'Missing pdfUrl parameter' },
+      { status: 400 }
+    );
+  }
+
+  // Reuse POST logic here
+  return POST(new Request('', { 
+    method: 'POST',
+    body: JSON.stringify({ pdfUrl })
+  }));
+} 

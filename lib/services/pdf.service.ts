@@ -12,7 +12,12 @@ export class PDFService {
   }
 
   public static async parseBase64PDF(base64String: string): Promise<string> {
-    const buffer = Buffer.from(base64String, 'base64');
-    return this.parsePDF(buffer);
+    try {
+      const buffer = Buffer.from(base64String, 'base64');
+      return this.parsePDF(buffer);
+    } catch (error) {
+      console.error('Error parsing base64 PDF:', error);
+      throw new Error('Failed to parse base64 PDF');
+    }
   }
 } 

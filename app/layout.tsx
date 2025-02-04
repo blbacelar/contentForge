@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from 'next/font/google';
 import "./globals.css";
 import { AnimatedLayout } from "@/components/layout/animated-layout";
 import { Toaster } from "@/components/ui/sonner"
+import { Buffer } from 'buffer';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-sans',
+})
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// Add this early in your app initialization
+if (typeof window !== 'undefined') {
+  window.Buffer = Buffer;
+}
 
 export const metadata: Metadata = {
   title: "AI Video Generator",
@@ -26,7 +27,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-zinc-950`}>
+      <body className={`${inter.variable} antialiased bg-zinc-950`}>
         <AnimatedLayout>
           <main className="container mx-auto p-4">
             {children}

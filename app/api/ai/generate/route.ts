@@ -1,87 +1,32 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
-import { env } from '@/config/environment';
-import { LANGUAGE_CODES } from '@/types/language';
-import { prompts } from '@/config/prompts';
+import type { NextRequest } from 'next/server';
 
-const schema = z.object({
-  type: z.enum(['summary', 'expertise', 'variation', 'captions']),
-  content: z.string().max(5000),
-  language: z.enum(LANGUAGE_CODES).optional()
-});
-
-const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
-
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json();
-    const validation = schema.safeParse(body);
-    
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: validation.error.flatten() },
-        { status: 400 }
-      );
-    }
+    const body = await request.json();
+    console.log('Received request body:', body);
 
-    const { content, language = 'en-US' } = validation.data;
-    const apiKey = env.deepseekApiKey;
+    const { type, content, language } = body;
 
-    if (!apiKey) {
-      throw new Error('DEEPSEEK_API_KEY environment variable is not set');
-    }
+    // For testing, let's return some mock data
+    const mockCaptions = content.split('.').filter(Boolean).map(sentence => sentence.trim());
 
-    const languageMap = {
-      'en-US': 'American English',
-      'es-ES': 'Spanish', 
-      'pt-BR': 'Brazilian Portuguese'
-    };
+    // Simulate API processing time
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const { systemPrompt, userPrompt } =  {
-          systemPrompt: prompts.captions.system(languageMap[language]),
-          userPrompt: prompts.captions.user(null, content, null)
-        }
-
-    const response = await fetch(DEEPSEEK_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: [{
-          role: 'user',
-          content: systemPrompt + userPrompt
-        }],
-        temperature: 0.7
-      })
+    return NextResponse.json({
+      success: true,
+      captions: mockCaptions,
+      message: 'Content generated successfully'
     });
 
-    if (!response.ok) {
-      throw new Error(`API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log('DeepSeek API Response Structure:', {
-      status: response.status,
-      dataKeys: Object.keys(data),
-      choicesExists: !!data.choices,
-      messageContent: data.choices?.[0]?.message?.content
-    });
-
-    const result = data.choices[0]?.message?.content?.trim() || '';
-    console.log('Processed Result:', result);
-
-    return NextResponse.json({ 
-      success: true, 
-      captions: result.split('\n').filter(Boolean) // Convert result to captions array
-    });
-    
   } catch (error) {
-    console.error('AI Generation Error:', error);
+    console.error('API Error:', error);
     return NextResponse.json(
-      { error: 'Content generation failed' },
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to process request' 
+      },
       { status: 500 }
     );
   }

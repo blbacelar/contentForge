@@ -1,8 +1,19 @@
-// Minimal configuration for Next.js 15+
-module.exports = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'https://contentforge-be.onrender.com/api/:path*'
+      }
+    ]
+  },
   reactStrictMode: true,
   swcMinify: true,
   experimental: {
-    serverActions: true
+    appDir: true,
+    serverActions: true,
   }
-}; 
+}
+
+module.exports = nextConfig
